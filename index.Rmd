@@ -1,0 +1,172 @@
+---
+title: "Topic Correlation Summary"
+author: "Muhammad Idrus F"
+date: "May 31, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Natural Language Processing (NLP) is a part of artificial intelligence concern on the interactions between computers and human language. There are several major tasks in NLP and one of it is topic segmentation and recognition. Also known as topic modelling. 
+
+
+### Topic Modelling
+Topic model is a type of statistical model for discovering the abstract "topics" that occur in a collection of documents. One of the most popular algorithm in topic modelling is Latent Dirichlet Allocation (LDA). It is useful tools for statistical analysis of document collection and other discrete data.
+
+
+#### Latent Dirichlet Allocation (LDA)
+LDA is a generative statistical model that allows sets of observations to be explained by unobserved groups that explain why some parts of the data are similar. For example, if observations are words collected into documents, it posits that each document is a mixture of a small number of topics and that each word's creation is attributable to one of the document's topics.
+
+In LDA, each document may be viewed as a mixture of various topics. For example, an LDA model might have topics that can be classified as *CAT related* and *DOG related*. A topic has probabilities of generating various words, such as _milk_, _meow_, and _kitten_, which can be classified and interpreted by the viewer as "CAT related". Naturally, the word _cat_ itself will have high probability given this topic. The "DOG related"" topic likewise has probabilities of generating each word: _puppy_, _bark_, and _bone_ might have high probability.
+
+
+##### Aplication, Extension and Similarity
+The LDA model is highly modular and can therefore be easily extended. The main field of interest is modeling relations between topics. This is achieved by using another distribution on the simplex instead of the Dirichlet. The Correlated Topic Model follows this approach, inducing a correlation structure between topics by using the logistic normal distribution instead of the Dirichlet. Another extension is the hierarchical LDA (hLDA),[10] where topics are joined together in a hierarchy by using the nested [Chinese restaurant process](https://en.wikipedia.org/wiki/Chinese_restaurant_process).
+
+
+#### Correlated Topic Model (CTM)
+As mentioned above, CTM is an extended of LDA. The CTM builds on the earlier latent Dirichlet allocation (LDA) model of Blei, Ng and Jordan, which is an instance of a general family of mixed membership models for decomposing data into multiple latent components.
+
+A limitation of LDA is the inability to model topic correlation even though, for example, a document about genetics is more likely to also be about disease than x-ray astronomy. This limitation stems from the use of the Dirichlet distribution to model the variability among the topic proportions. CTM is able to develop correlation via the logistic normal distribution. The CTM gives a better fit than LDA on a collection of OCRed articles from the journal Science. Furthermore, the CTM provides a natural way of visualizing and exploring this and other unstructured data sets.
+
+
+### Topic Modelling in R
+There are several packages in R which can be used for topic modelling i.e _topicmodelling_, _tm_, _lda_ and _stm_ package.  But _stm_ package has most advance compared to others. _stm_ (Structural Topic Model) package allows researchers to flexibly estimate a topic model that includes document-level meta-data. Estimation is accomplished through a fast variational approximation based approach. The _stm_ package also provides many useful features, including rich ways to explore topics, appropriate uncertainty estimation, and extensive plotting and visualization options.
+
+
+#### stm Package Demo
+In this section we demonstrate the basics of using the package. presents a heuristic overview of the package, which parallels a typical workflow. For each step we list different functions in the stm package that accomplish each task. First users ingest the data and prepare it for analysis. Next a structural topic model is estimated. After that, stm package allows us to dig deeper our analysis by _evaluate_, _understand_ and _visualize_ our estimation.
+
+##### Table of Content
+* [Ingest](#chapter-1)
+* [Estimate](#chapter-2)
+* [Evaluate](#chapter-3)
+* [Understand](#chapter-4)
+* [Refference](#refference)
+
+##### **Ingest** : Reading and processing text data <a id="chapter-1"></a>
+The firt step is setting up the package in our R by activate the library. 
+
+```{r message=FALSE, warning = FALSE, results='hide'}
+library(stm)
+library(dplyr) # for data prepartion
+```
+
+If we haven't installed stm package, we should install it first using:
+* install.packages("stm")
+or 
+* library(devtools)
+* install_github("bstewart/stm",dependencies=TRUE)
+
+Then, load and clean the data. 
+```{r message=FALSE, warning = FALSE, results='hide'}
+doc = read.csv("C:/Work/data_text.csv")
+doc = select(doc, -c(2))
+stpw = readLines("C:/Work/code/stopwords-id.txt") #because we use bahasa Indonesia, we need to add a list of stopwords bahasa indonesia to customstopwords to remove unnecessary word from our data
+
+processed = textProcessor(doc$Content, metadata=doc,
+                          lowercase=TRUE, removestopwords=TRUE, removenumbers=TRUE,
+                          removepunctuation=TRUE, stem=TRUE, wordLengths=c(3,Inf),
+                          sparselevel=1,
+                          verbose=TRUE, onlycharacter= FALSE, striphtml=FALSE,
+                          customstopwords=stpw, onlytxtfiles=TRUE)
+
+#structure and index for usage in the stm model.
+out <- prepDocuments(processed$documents, processed$vocab, processed$meta)
+plotRemoved(processed$documents, lower.thresh=seq(1,200, by=100))
+
+#output will have object meta, documents, and vocab 
+docs <- out$documents
+vocab <- out$vocab
+meta <-out$meta
+
+```
+
+_textProcessor_ function implements stop removal stopwords, converting to lower case, removing number, removing punctuation, and creating output. _prepDocuments_ used to process data into the right format and removing words due to frequency.
+
+
+##### **Estimate** : Estimating the structural topic model <a id="chapter-2"></a>
+
+The ingest process will output the clean data with right format. Then the output used for estimating the structural topic model.
+```{r message=FALSE, warning = FALSE, results='hide'}
+#run an stm model using the 'out' data. K topics
+docFit <- stm(out$documents,out$vocab,K=7, max.em.its=75, data=out$meta,seed=5926696)
+```
+We set the number of topic as 7, but stm allows us to select our preferred number of topic.
+
+
+##### **Evaluate** : Model selection and search <a id="chapter-3"></a>
+
+After we estimate structural topic modelling, the next thing to do is finding out the best model of our estimation.
+
+_Model selection_  
+Users may wish to esimate a many model. The function selectModel automates this process to facilitate finding a model with good properties. _plotModels_ helps users to visualize the result of model selection. 
+
+```{r message=FALSE, warning = FALSE, results='hide'}
+docSelect <- selectModel(out$documents,out$vocab,K=7, max.em.its=75,data=meta,runs=10,seed=8458159)
+plotModels(docSelect)
+```
+
+_Model search_  
+Other way to evaluate the estimation is using the maximum number of topic (K). There is not a “right” answer to the number of topics that are appropriate for a given corpus, but the function searchK uses a data-driven approach to selecting the number of topics. The function will perform several automated tests to help choose the number of topics including calculating the held out likelihood (Wallach et al. 2009) and performing a residual analysis (Taddy 2012).
+
+```{r message=FALSE, warning = FALSE, results='hide'}
+storage <- searchK(out$documents, out$vocab, K = c(4, 7), data = meta)
+```
+```{r}
+storage
+```
+
+
+##### **Understand** : Interpreting the STM by plotting and inspecting results <a id="chapter-4"></a>
+
+After choosing a model based on ex-ante criteria, the user must next interpret the model
+results. There are many ways to investigate the output, such inspecting the words associated
+with topics or the relationship between metadata and topics. To investigate the output of the
+model, the stm package provides a number of options.
+
+* Displaying words associated with topics
+* Estimating relationships between metadata and topics/topical content
+* Calculating topic correlations
+
+_Understanding topics through words and example documents_  
+The first approach is to look at collections of words that are associated with topics
+```{r message=FALSE, warning = FALSE}
+labelTopics(docFit, c(1, 5, 7)) #list of top words for specific topic
+```
+
+We can also use wordcloud to display collections of words that are associated with specific topic
+```{r, warning=FALSE}
+cloud(docFit, topic= 7) #wordcloud for specific topic
+```
+
+Other way to understand the topic is using _plot.STM_ function with type 'persepective'
+```{r}
+plot.STM(docFit, type = "perspectives", topics = c(2, 5))
+```
+
+_Estimating metadata/topic relationships_  
+stm package permits correlation between topic. These can be visualized using plot.topicCorr(). The user can specify a correlation threshold. If two topics are correlated above that threshold, then those two topics are considered to be linked.
+
+```{r}
+mod.out.corr<-topicCorr(docFit) #topic correlation
+plot.topicCorr(mod.out.corr)
+```
+
+_Summary visualization_  
+Corpus level visualization can be done in several different ways. The first relates to the
+expected proportion of the corpus that belongs to each topic. This can be be plotted using
+plot.stm(,type = "summary").
+
+```{r}
+plot.STM(docFit, type="summary", xlim=c(0,.4))
+```
+
+
+
+#### Refferences : <a id="refference"></a>
+[LDA](https://en.wikipedia.org/wiki/Latent_Dirichlet_allocation), 
+[CTM](https://www.cs.princeton.edu/~blei/papers/BleiLafferty2006.pdf),
+[stm package](https://cran.r-project.org/web/packages/stm/vignettes/stmVignette.pdf)
